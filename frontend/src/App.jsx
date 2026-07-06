@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react"
 import axios from "axios"
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 
 const API = "http://localhost:8000"
 
-// Fix default marker icons
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -17,87 +16,171 @@ L.Icon.Default.mergeOptions({
 const ambulanceIcon = new L.Icon({
   iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+  iconSize: [25, 41], iconAnchor: [12, 41],
 })
 
 const hospitalIcon = new L.Icon({
   iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+  iconSize: [25, 41], iconAnchor: [12, 41],
 })
 
 const incidentIcon = new L.Icon({
   iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+  iconSize: [25, 41], iconAnchor: [12, 41],
 })
+
+// This component listens for map clicks and sets coordinates
+function MapClickHandler({ onMapClick }) {
+  useMapEvents({
+    click(e) {
+      onMapClick(e.latlng)
+    }
+  })
+  return null
+}
 
 function App() {
   const [ambulances, setAmbulances] = useState([])
   const [hospitals, setHospitals] = useState([])
   const [incidents, setIncidents] = useState([])
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({
+    type: "accident",
+    severity: "high",
+    latitude: "",
+    longitude: "",
+    description: ""
+  })
 
-  useEffect(() => {
+  const fetchData = () => {
     axios.get(`${API}/ambulances/`).then(res => setAmbulances(res.data))
     axios.get(`${API}/hospitals/`).then(res => setHospitals(res.data))
     axios.get(`${API}/incidents/`).then(res => setIncidents(res.data))
-  }, [])
+  }
+
+  useEffect(() => { fetchData() }, [])
+
+  const handleMapClick = (latlng) => {
+    setForm(f => ({ ...f, latitude: latlng.lat.toFixed(4), longitude: latlng.lng.toFixed(4) }))
+    setShowForm(true)
+  }
+
+  const handleSubmit = async () => {
+    if (!form.latitude || !form.longitude) return
+    await axios.post(`${API}/incidents/`, {
+      ...form,
+      latitude: parseFloat(form.latitude),
+      longitude: parseFloat(form.longitude)
+    })
+    setShowForm(false)
+    setForm({ type: "accident", severity: "high", latitude: "", longitude: "", description: "" })
+    fetchData()
+  }
 
   return (
     <div style={{ fontFamily: "sans-serif", background: "#0f1117", minHeight: "100vh", color: "white" }}>
-      
+
       {/* Header */}
       <div style={{ padding: "1rem 2rem", borderBottom: "1px solid #222", display: "flex", alignItems: "center", gap: "1rem" }}>
         <h1 style={{ color: "#00ff88", margin: 0 }}>ResQOps</h1>
         <span style={{ color: "#888" }}>AI Emergency Response Operating System</span>
-        <div style={{ marginLeft: "auto", display: "flex", gap: "1rem" }}>
+        <div style={{ marginLeft: "auto", display: "flex", gap: "1rem", alignItems: "center" }}>
           <span style={{ color: "#00ff88" }}>🚑 {ambulances.filter(a => a.status === "available").length} available</span>
           <span style={{ color: "#4488ff" }}>🏥 {hospitals.length} hospitals</span>
           <span style={{ color: "#ff4444" }}>🚨 {incidents.length} incidents</span>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            style={{ background: "#ff4444", color: "white", border: "none", padding: "0.5rem 1rem", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}
+          >
+            + New Incident
+          </button>
         </div>
       </div>
 
+      {/* Incident Form */}
+      {showForm && (
+        <div style={{ background: "#1a1a2e", border: "1px solid #ff4444", borderRadius: "8px", padding: "1.5rem", margin: "1rem 2rem" }}>
+          <h3 style={{ color: "#ff4444", marginTop: 0 }}>🚨 Create New Incident</h3>
+          <p style={{ color: "#888", fontSize: "13px" }}>Click on the map to set location, or enter coordinates manually.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+            <div>
+              <label style={{ color: "#888", fontSize: "12px" }}>Type</label>
+              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+                style={{ width: "100%", background: "#0f1117", color: "white", border: "1px solid #333", padding: "0.5rem", borderRadius: "4px", marginTop: "4px" }}>
+                <option value="accident">Accident</option>
+                <option value="cardiac">Cardiac</option>
+                <option value="fire">Fire</option>
+                <option value="trauma">Trauma</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ color: "#888", fontSize: "12px" }}>Severity</label>
+              <select value={form.severity} onChange={e => setForm(f => ({ ...f, severity: e.target.value }))}
+                style={{ width: "100%", background: "#0f1117", color: "white", border: "1px solid #333", padding: "0.5rem", borderRadius: "4px", marginTop: "4px" }}>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ color: "#888", fontSize: "12px" }}>Latitude</label>
+              <input value={form.latitude} onChange={e => setForm(f => ({ ...f, latitude: e.target.value }))}
+                placeholder="Click map"
+                style={{ width: "100%", background: "#0f1117", color: "white", border: "1px solid #333", padding: "0.5rem", borderRadius: "4px", marginTop: "4px" }} />
+            </div>
+            <div>
+              <label style={{ color: "#888", fontSize: "12px" }}>Longitude</label>
+              <input value={form.longitude} onChange={e => setForm(f => ({ ...f, longitude: e.target.value }))}
+                placeholder="Click map"
+                style={{ width: "100%", background: "#0f1117", color: "white", border: "1px solid #333", padding: "0.5rem", borderRadius: "4px", marginTop: "4px" }} />
+            </div>
+          </div>
+          <div style={{ marginBottom: "1rem" }}>
+            <label style={{ color: "#888", fontSize: "12px" }}>Description</label>
+            <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="Brief description of the incident"
+              style={{ width: "100%", background: "#0f1117", color: "white", border: "1px solid #333", padding: "0.5rem", borderRadius: "4px", marginTop: "4px" }} />
+          </div>
+          <div style={{ display: "flex", gap: "1rem" }}>
+            <button onClick={handleSubmit}
+              style={{ background: "#ff4444", color: "white", border: "none", padding: "0.5rem 1.5rem", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}>
+              Create Incident
+            </button>
+            <button onClick={() => setShowForm(false)}
+              style={{ background: "transparent", color: "#888", border: "1px solid #333", padding: "0.5rem 1.5rem", borderRadius: "6px", cursor: "pointer" }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Map */}
-      <div style={{ height: "60vh", width: "100%" }}>
+      <div style={{ height: "55vh", width: "100%", marginTop: "0.5rem" }}>
         <MapContainer center={[40.7128, -74.0060]} zoom={11} style={{ height: "100%", width: "100%" }}>
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution="© OpenStreetMap"
-          />
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="© OpenStreetMap" />
+          <MapClickHandler onMapClick={handleMapClick} />
           {ambulances.map(a => (
             <Marker key={a.id} position={[a.latitude, a.longitude]} icon={ambulanceIcon}>
-              <Popup>
-                <strong>{a.name}</strong><br />
-                Status: {a.status}<br />
-                Equipment: {a.equipment}
-              </Popup>
+              <Popup><strong>{a.name}</strong><br />Status: {a.status}<br />Equipment: {a.equipment}</Popup>
             </Marker>
           ))}
           {hospitals.map(h => (
             <Marker key={h.id} position={[h.latitude, h.longitude]} icon={hospitalIcon}>
-              <Popup>
-                <strong>{h.name}</strong><br />
-                Beds available: {h.available_beds}/{h.total_beds}<br />
-                Trauma Level: {h.trauma_level}
-              </Popup>
+              <Popup><strong>{h.name}</strong><br />Beds: {h.available_beds}/{h.total_beds}<br />Trauma Level: {h.trauma_level}</Popup>
             </Marker>
           ))}
           {incidents.map(i => (
             <Marker key={i.id} position={[i.latitude, i.longitude]} icon={incidentIcon}>
-              <Popup>
-                <strong>{i.type.toUpperCase()}</strong><br />
-                Severity: {i.severity}<br />
-                {i.description}
-              </Popup>
+              <Popup><strong>{i.type.toUpperCase()}</strong><br />Severity: {i.severity}<br />{i.description}</Popup>
             </Marker>
           ))}
         </MapContainer>
       </div>
 
-      {/* Stats row */}
+      {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", padding: "1rem 2rem" }}>
         <div style={{ background: "#1a1a2e", borderRadius: "8px", padding: "1rem" }}>
           <h3 style={{ color: "#00ff88", marginTop: 0 }}>🚑 Ambulances</h3>
