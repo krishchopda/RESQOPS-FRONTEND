@@ -44,6 +44,9 @@ function App() {
   const [incidents, setIncidents] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [recommendation, setRecommendation] = useState(null)
+  const [aiQuestion, setAiQuestion] = useState("")
+  const [aiAnswer, setAiAnswer] = useState("")
+  const [aiLoading, setAiLoading] = useState(false)
   const [form, setForm] = useState({
     type: "accident", severity: "high",
     latitude: "", longitude: "", description: ""
@@ -77,6 +80,14 @@ function App() {
   const handleDispatch = async (incidentId) => {
     const res = await axios.get(`${API}/dispatch/recommend/${incidentId}`)
     setRecommendation(res.data)
+  }
+
+  const handleAskAI = async () => {
+    if (!aiQuestion.trim()) return
+    setAiLoading(true)
+    const res = await axios.post(`${API}/ai/ask`, { question: aiQuestion })
+    setAiAnswer(res.data.answer)
+    setAiLoading(false)
   }
 
   return (
@@ -256,6 +267,47 @@ function App() {
           ))}
         </div>
       </div>
+
+      {/* AI Assistant */}
+      <div style={{ padding: "1rem 2rem 2rem" }}>
+        <div style={{ background: "#1a1a2e", borderRadius: "8px", padding: "1.5rem" }}>
+          <h3 style={{ color: "#00ff88", marginTop: 0 }}>🤖 AI Operations Assistant</h3>
+          <p style={{ color: "#888", fontSize: "13px", margin: "0 0 1rem" }}>
+            Ask anything about your current operations.
+          </p>
+          <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
+            <input
+              value={aiQuestion}
+              onChange={e => setAiQuestion(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleAskAI()}
+              placeholder="e.g. Which hospital should we avoid? Why was AMB-02 chosen?"
+              style={{ flex: 1, background: "#0f1117", color: "white", border: "1px solid #333", padding: "0.75rem", borderRadius: "6px", fontSize: "13px" }}
+            />
+            <button
+              onClick={handleAskAI}
+              disabled={aiLoading}
+              style={{ background: "#00ff88", color: "#000", border: "none", padding: "0.75rem 1.5rem", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}
+            >
+              {aiLoading ? "Thinking..." : "Ask AI"}
+            </button>
+          </div>
+          {aiAnswer && (
+            <div style={{ background: "#0f1117", borderRadius: "6px", padding: "1rem", border: "1px solid #333" }}>
+              <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>AI RESPONSE</div>
+              <div style={{ color: "#ccc", fontSize: "13px", lineHeight: "1.8", whiteSpace: "pre-wrap" }}>{aiAnswer}</div>
+            </div>
+          )}
+          <div style={{ marginTop: "1rem", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {["Which hospital should we avoid?", "What is our biggest risk right now?", "Which ambulances are available?", "Summarize current operations"].map(q => (
+              <button key={q} onClick={() => setAiQuestion(q)}
+                style={{ background: "transparent", color: "#888", border: "1px solid #333", padding: "4px 12px", borderRadius: "20px", cursor: "pointer", fontSize: "12px" }}>
+                {q}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
     </div>
   )
 }
