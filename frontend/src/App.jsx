@@ -31,12 +31,9 @@ const incidentIcon = new L.Icon({
   iconSize: [25, 41], iconAnchor: [12, 41],
 })
 
-// This component listens for map clicks and sets coordinates
 function MapClickHandler({ onMapClick }) {
   useMapEvents({
-    click(e) {
-      onMapClick(e.latlng)
-    }
+    click(e) { onMapClick(e.latlng) }
   })
   return null
 }
@@ -46,12 +43,10 @@ function App() {
   const [hospitals, setHospitals] = useState([])
   const [incidents, setIncidents] = useState([])
   const [showForm, setShowForm] = useState(false)
+  const [recommendation, setRecommendation] = useState(null)
   const [form, setForm] = useState({
-    type: "accident",
-    severity: "high",
-    latitude: "",
-    longitude: "",
-    description: ""
+    type: "accident", severity: "high",
+    latitude: "", longitude: "", description: ""
   })
 
   const fetchData = () => {
@@ -79,6 +74,11 @@ function App() {
     fetchData()
   }
 
+  const handleDispatch = async (incidentId) => {
+    const res = await axios.get(`${API}/dispatch/recommend/${incidentId}`)
+    setRecommendation(res.data)
+  }
+
   return (
     <div style={{ fontFamily: "sans-serif", background: "#0f1117", minHeight: "100vh", color: "white" }}>
 
@@ -90,14 +90,50 @@ function App() {
           <span style={{ color: "#00ff88" }}>🚑 {ambulances.filter(a => a.status === "available").length} available</span>
           <span style={{ color: "#4488ff" }}>🏥 {hospitals.length} hospitals</span>
           <span style={{ color: "#ff4444" }}>🚨 {incidents.length} incidents</span>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            style={{ background: "#ff4444", color: "white", border: "none", padding: "0.5rem 1rem", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}
-          >
+          <button onClick={() => setShowForm(!showForm)}
+            style={{ background: "#ff4444", color: "white", border: "none", padding: "0.5rem 1rem", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}>
             + New Incident
           </button>
         </div>
       </div>
+
+      {/* Recommendation Panel */}
+      {recommendation && (
+        <div style={{ background: "#0a2a1a", border: "1px solid #00ff88", borderRadius: "8px", padding: "1.5rem", margin: "1rem 2rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+            <h3 style={{ color: "#00ff88", margin: 0 }}>⚡ Dispatch Recommendation</h3>
+            <button onClick={() => setRecommendation(null)}
+              style={{ background: "transparent", color: "#888", border: "1px solid #333", padding: "4px 12px", borderRadius: "4px", cursor: "pointer" }}>
+              Dismiss
+            </button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+            <div style={{ background: "#1a1a2e", borderRadius: "6px", padding: "1rem" }}>
+              <div style={{ color: "#888", fontSize: "11px", marginBottom: "4px" }}>INCIDENT</div>
+              <div style={{ color: "white", fontWeight: "bold" }}>{recommendation.incident?.type?.toUpperCase()}</div>
+              <div style={{ color: "#ff4444" }}>{recommendation.incident?.severity}</div>
+            </div>
+            <div style={{ background: "#1a1a2e", borderRadius: "6px", padding: "1rem" }}>
+              <div style={{ color: "#888", fontSize: "11px", marginBottom: "4px" }}>AMBULANCE</div>
+              <div style={{ color: "#00ff88", fontWeight: "bold" }}>{recommendation.ambulance?.name}</div>
+              <div style={{ color: "#888", fontSize: "12px" }}>{recommendation.ambulance?.equipment} • {recommendation.ambulance?.distance_km}km away</div>
+            </div>
+            <div style={{ background: "#1a1a2e", borderRadius: "6px", padding: "1rem" }}>
+              <div style={{ color: "#888", fontSize: "11px", marginBottom: "4px" }}>HOSPITAL</div>
+              <div style={{ color: "#4488ff", fontWeight: "bold" }}>{recommendation.hospital?.name}</div>
+              <div style={{ color: "#888", fontSize: "12px" }}>Level {recommendation.hospital?.trauma_level} • {recommendation.hospital?.available_beds} beds • {recommendation.hospital?.distance_km}km</div>
+            </div>
+          </div>
+          <div style={{ background: "#1a1a2e", borderRadius: "6px", padding: "1rem", marginBottom: "0.5rem" }}>
+            <div style={{ color: "#888", fontSize: "11px", marginBottom: "4px" }}>REASONING</div>
+            <div style={{ color: "#ccc", fontSize: "13px", lineHeight: "1.6" }}>{recommendation.explanation}</div>
+          </div>
+          <div style={{ color: "#888", fontSize: "12px" }}>
+            Confidence: <span style={{ color: "#00ff88" }}>{recommendation.confidence}%</span> •
+            Candidates evaluated: <span style={{ color: "#00ff88" }}>{recommendation.candidates_evaluated}</span>
+          </div>
+        </div>
+      )}
 
       {/* Incident Form */}
       {showForm && (
@@ -203,9 +239,19 @@ function App() {
         <div style={{ background: "#1a1a2e", borderRadius: "8px", padding: "1rem" }}>
           <h3 style={{ color: "#ff4444", marginTop: 0 }}>🚨 Incidents</h3>
           {incidents.map(i => (
-            <div key={i.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #222" }}>
-              <span>{i.type}</span>
-              <span style={{ color: i.severity === "critical" ? "#ff4444" : i.severity === "high" ? "#ff8800" : "#ffff00" }}>{i.severity}</span>
+            <div key={i.id} style={{ padding: "8px 0", borderBottom: "1px solid #222" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>{i.type}</span>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <span style={{ color: i.severity === "critical" ? "#ff4444" : i.severity === "high" ? "#ff8800" : "#ffff00" }}>
+                    {i.severity}
+                  </span>
+                  <button onClick={() => handleDispatch(i.id)}
+                    style={{ background: "#00ff88", color: "#000", border: "none", padding: "2px 8px", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontWeight: "bold" }}>
+                    Dispatch
+                  </button>
+                </div>
+              </div>
             </div>
           ))}
         </div>
