@@ -42,6 +42,7 @@ function App() {
   const [ambulances, setAmbulances] = useState([])
   const [hospitals, setHospitals] = useState([])
   const [incidents, setIncidents] = useState([])
+  const [predictions, setPredictions] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [recommendation, setRecommendation] = useState(null)
   const [aiQuestion, setAiQuestion] = useState("")
@@ -56,6 +57,7 @@ function App() {
     axios.get(`${API}/ambulances/`).then(res => setAmbulances(res.data))
     axios.get(`${API}/hospitals/`).then(res => setHospitals(res.data))
     axios.get(`${API}/incidents/`).then(res => setIncidents(res.data))
+    axios.get(`${API}/predictions/`).then(res => setPredictions(res.data))
   }
 
   useEffect(() => { fetchData() }, [])
@@ -101,6 +103,11 @@ function App() {
           <span style={{ color: "#00ff88" }}>🚑 {ambulances.filter(a => a.status === "available").length} available</span>
           <span style={{ color: "#4488ff" }}>🏥 {hospitals.length} hospitals</span>
           <span style={{ color: "#ff4444" }}>🚨 {incidents.length} incidents</span>
+          {predictions && predictions.summary.critical > 0 && (
+            <span style={{ background: "#ff4444", color: "white", padding: "2px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "bold" }}>
+              ⚠ {predictions.summary.critical} critical alerts
+            </span>
+          )}
           <button onClick={() => setShowForm(!showForm)}
             style={{ background: "#ff4444", color: "white", border: "none", padding: "0.5rem 1rem", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}>
             + New Incident
@@ -108,9 +115,53 @@ function App() {
         </div>
       </div>
 
+      {/* Alerts Panel */}
+      {predictions && predictions.summary.total_alerts > 0 && (
+        <div style={{ margin: "0.75rem 2rem" }}>
+          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+            {predictions.hospital_alerts.map((alert, i) => (
+              <div key={i} style={{
+                background: alert.type === "critical" ? "#2a0a0a" : "#2a1f0a",
+                border: `1px solid ${alert.type === "critical" ? "#ff4444" : "#ff8800"}`,
+                borderRadius: "8px", padding: "0.75rem 1rem", flex: "1", minWidth: "200px"
+              }}>
+                <div style={{ fontSize: "11px", color: alert.type === "critical" ? "#ff4444" : "#ff8800", marginBottom: "4px" }}>
+                  {alert.type === "critical" ? "🔴 CRITICAL" : "🟡 WARNING"} — HOSPITAL
+                </div>
+                <div style={{ fontSize: "13px", color: "#ccc" }}>{alert.message}</div>
+              </div>
+            ))}
+            {predictions.hotspots.map((spot, i) => (
+              <div key={i} style={{
+                background: "#2a0a0a",
+                border: "1px solid #ff4444",
+                borderRadius: "8px", padding: "0.75rem 1rem", flex: "1", minWidth: "200px"
+              }}>
+                <div style={{ fontSize: "11px", color: "#ff4444", marginBottom: "4px" }}>
+                  🔴 CRITICAL — HOTSPOT
+                </div>
+                <div style={{ fontSize: "13px", color: "#ccc" }}>{spot.message}</div>
+              </div>
+            ))}
+            {predictions.ambulance_alerts.map((alert, i) => (
+              <div key={i} style={{
+                background: "#2a0a0a",
+                border: "1px solid #ff4444",
+                borderRadius: "8px", padding: "0.75rem 1rem", flex: "1", minWidth: "200px"
+              }}>
+                <div style={{ fontSize: "11px", color: "#ff4444", marginBottom: "4px" }}>
+                  🔴 CRITICAL — RESOURCES
+                </div>
+                <div style={{ fontSize: "13px", color: "#ccc" }}>{alert.message}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Recommendation Panel */}
       {recommendation && (
-        <div style={{ background: "#0a2a1a", border: "1px solid #00ff88", borderRadius: "8px", padding: "1.5rem", margin: "1rem 2rem" }}>
+        <div style={{ background: "#0a2a1a", border: "1px solid #00ff88", borderRadius: "8px", padding: "1.5rem", margin: "0.75rem 2rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
             <h3 style={{ color: "#00ff88", margin: 0 }}>⚡ Dispatch Recommendation</h3>
             <button onClick={() => setRecommendation(null)}
@@ -127,12 +178,16 @@ function App() {
             <div style={{ background: "#1a1a2e", borderRadius: "6px", padding: "1rem" }}>
               <div style={{ color: "#888", fontSize: "11px", marginBottom: "4px" }}>AMBULANCE</div>
               <div style={{ color: "#00ff88", fontWeight: "bold" }}>{recommendation.ambulance?.name}</div>
-              <div style={{ color: "#888", fontSize: "12px" }}>{recommendation.ambulance?.equipment} • {recommendation.ambulance?.distance_km}km away</div>
+              <div style={{ color: "#888", fontSize: "12px" }}>
+                {recommendation.ambulance?.equipment} • {recommendation.ambulance?.distance_km}km • {recommendation.ambulance?.travel_time_min} min
+              </div>
             </div>
             <div style={{ background: "#1a1a2e", borderRadius: "6px", padding: "1rem" }}>
               <div style={{ color: "#888", fontSize: "11px", marginBottom: "4px" }}>HOSPITAL</div>
               <div style={{ color: "#4488ff", fontWeight: "bold" }}>{recommendation.hospital?.name}</div>
-              <div style={{ color: "#888", fontSize: "12px" }}>Level {recommendation.hospital?.trauma_level} • {recommendation.hospital?.available_beds} beds • {recommendation.hospital?.distance_km}km</div>
+              <div style={{ color: "#888", fontSize: "12px" }}>
+                Level {recommendation.hospital?.trauma_level} • {recommendation.hospital?.available_beds} beds • {recommendation.hospital?.travel_time_min} min
+              </div>
             </div>
           </div>
           <div style={{ background: "#1a1a2e", borderRadius: "6px", padding: "1rem", marginBottom: "0.5rem" }}>
@@ -148,7 +203,7 @@ function App() {
 
       {/* Incident Form */}
       {showForm && (
-        <div style={{ background: "#1a1a2e", border: "1px solid #ff4444", borderRadius: "8px", padding: "1.5rem", margin: "1rem 2rem" }}>
+        <div style={{ background: "#1a1a2e", border: "1px solid #ff4444", borderRadius: "8px", padding: "1.5rem", margin: "0.75rem 2rem" }}>
           <h3 style={{ color: "#ff4444", marginTop: 0 }}>🚨 Create New Incident</h3>
           <p style={{ color: "#888", fontSize: "13px" }}>Click on the map to set location, or enter coordinates manually.</p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
