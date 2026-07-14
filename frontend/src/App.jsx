@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaf
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 
-const API = "http://localhost:8000"
+const API = "https://resqops-backend.onrender.com"
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
