@@ -104,10 +104,11 @@ function App() {
           <span style={{ color: "#4488ff" }}>🏥 {hospitals.length} hospitals</span>
           <span style={{ color: "#ff4444" }}>🚨 {incidents.length} incidents</span>
           {predictions && predictions.summary.critical > 0 && (
-            <span style={{ background: "#ff4444", color: "white", padding: "2px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "bold" }}>
-              ⚠ {predictions.summary.critical} critical alerts
-            </span>
-          )}
+  <span style={{ background: "#ff444422", color: "#ff4444", padding: "2px 10px", borderRadius: "20px", fontSize: "12px", border: "1px solid #ff444444" }}>
+    ⚠ {predictions.summary.critical} critical
+  </span>
+)}
+          
           <button onClick={() => setShowForm(!showForm)}
             style={{ background: "#ff4444", color: "white", border: "none", padding: "0.5rem 1rem", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}>
             + New Incident
@@ -116,48 +117,50 @@ function App() {
       </div>
 
       {/* Alerts Panel */}
-      {predictions && predictions.summary.total_alerts > 0 && (
-        <div style={{ margin: "0.75rem 2rem" }}>
-          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-            {predictions.hospital_alerts.map((alert, i) => (
-              <div key={i} style={{
-                background: alert.type === "critical" ? "#2a0a0a" : "#2a1f0a",
-                border: `1px solid ${alert.type === "critical" ? "#ff4444" : "#ff8800"}`,
-                borderRadius: "8px", padding: "0.75rem 1rem", flex: "1", minWidth: "200px"
-              }}>
-                <div style={{ fontSize: "11px", color: alert.type === "critical" ? "#ff4444" : "#ff8800", marginBottom: "4px" }}>
-                  {alert.type === "critical" ? "🔴 CRITICAL" : "🟡 WARNING"} — HOSPITAL
-                </div>
-                <div style={{ fontSize: "13px", color: "#ccc" }}>{alert.message}</div>
-              </div>
-            ))}
-            {predictions.hotspots.map((spot, i) => (
-              <div key={i} style={{
-                background: "#2a0a0a",
-                border: "1px solid #ff4444",
-                borderRadius: "8px", padding: "0.75rem 1rem", flex: "1", minWidth: "200px"
-              }}>
-                <div style={{ fontSize: "11px", color: "#ff4444", marginBottom: "4px" }}>
-                  🔴 CRITICAL — HOTSPOT
-                </div>
-                <div style={{ fontSize: "13px", color: "#ccc" }}>{spot.message}</div>
-              </div>
-            ))}
-            {predictions.ambulance_alerts.map((alert, i) => (
-              <div key={i} style={{
-                background: "#2a0a0a",
-                border: "1px solid #ff4444",
-                borderRadius: "8px", padding: "0.75rem 1rem", flex: "1", minWidth: "200px"
-              }}>
-                <div style={{ fontSize: "11px", color: "#ff4444", marginBottom: "4px" }}>
-                  🔴 CRITICAL — RESOURCES
-                </div>
-                <div style={{ fontSize: "13px", color: "#ccc" }}>{alert.message}</div>
-              </div>
-            ))}
+      {/* Hospital Status Bar */}
+{predictions && (
+  <div style={{ margin: "0.5rem 2rem", display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+    <span style={{ fontSize: "11px", color: "#888", marginRight: "4px" }}>HOSPITAL LOAD</span>
+    {[...hospitals]
+      .sort((a, b) => (1 - b.available_beds / b.total_beds) - (1 - a.available_beds / a.total_beds))
+      .slice(0, 5)
+      .map(h => {
+        const load = Math.round((1 - h.available_beds / h.total_beds) * 100)
+        const color = load >= 90 ? "#ff4444" : load >= 75 ? "#ff8800" : "#00ff88"
+        return (
+          <div key={h.id} style={{
+            display: "flex", alignItems: "center", gap: "6px",
+            background: "#1a1a2e", border: `0.5px solid ${color}33`,
+            borderRadius: "20px", padding: "4px 12px"
+          }}>
+            <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: color }} />
+            <span style={{ fontSize: "12px", color: "#ccc" }}>{h.name.split(" ")[0]}</span>
+            <span style={{ fontSize: "12px", color, fontWeight: "500" }}>{load}%</span>
           </div>
-        </div>
-      )}
+        )
+      })}
+
+    {/* Only show critical alert if 90%+ or hotspot */}
+    {predictions.hospital_alerts.filter(a => a.type === "critical").map((alert, i) => (
+      <div key={i} style={{
+        background: "#2a0a0a", border: "1px solid #ff4444",
+        borderRadius: "20px", padding: "4px 12px",
+        fontSize: "12px", color: "#ff4444"
+      }}>
+        🔴 {alert.hospital} critically full
+      </div>
+    ))}
+    {predictions.hotspots.length > 0 && (
+      <div style={{
+        background: "#2a0a0a", border: "1px solid #ff4444",
+        borderRadius: "20px", padding: "4px 12px",
+        fontSize: "12px", color: "#ff4444"
+      }}>
+        🔴 {predictions.hotspots[0].incident_count} incidents clustered — possible mass casualty
+      </div>
+    )}
+  </div>
+)}
 
       {/* Recommendation Panel */}
       {recommendation && (
